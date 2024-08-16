@@ -1,0 +1,7 @@
+STORAGE: NONE
+RESTRICTION: == net6.0
+NUGET
+  remote: https://api.nuget.org/v3/index.json
+    FSharp.Core (6.0.7)
+    Microsoft.NETCore.App.Ref (6.0.19)
+    Microsoft.NetCore.App.Runtime.linux-x64 (6.0.19)

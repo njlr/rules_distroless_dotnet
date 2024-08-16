@@ -1,0 +1,87 @@
+load("@rules_oci//oci:defs.bzl", "oci_image", "oci_tarball")
+load("@rules_dotnet//dotnet:defs.bzl", "fsharp_binary", "publish_binary")
+load("@rules_pkg//:pkg.bzl", "pkg_tar")
+load("@rules_pkg//:mappings.bzl", "strip_prefix")
+
+fsharp_binary(
+  name = "app",
+  srcs = [
+    "Program.fs",
+  ],
+  target_frameworks = [
+    "net6.0",
+  ],
+  deps = [
+    "@paket.main//microsoft.netcore.app.ref",
+    "@paket.main//fsharp.core",
+  ],
+  targeting_packs = [
+    "@paket.main//microsoft.netcore.app.ref",
+  ],
+)
+
+publish_binary(
+  name = "app-linux-x64",
+  binary = ":app",
+  target_framework = "net6.0",
+  self_contained = True,
+  runtime_identifier = "linux-x64",
+  runtime_packs = [
+    "@paket.main//microsoft.netcore.app.runtime.linux-x64",
+  ],
+)
+
+pkg_tar(
+  name = "app_files",
+  strip_prefix = strip_prefix.from_pkg(),
+  package_dir = "/home",
+  srcs = [
+    ":app-linux-x64",
+  ],
+  include_runfiles = True,
+)
+
+PACKAGES = [
+  "@bullseye//bash",
+  # "@bullseye//coreutils", # Uncomment to add `ls` etc.
+  "@bullseye//libstdc++6",
+  "@bullseye//libicu67",
+  "@bullseye//git",
+]
+
+pkg_tar(
+  name = "debs",
+  deps = select({
+    "@platforms//cpu:arm64": [
+      "%s/arm64" % package
+      for package in PACKAGES
+    ],
+    "@platforms//cpu:x86_64": [
+      "%s/amd64" % package
+      for package in PACKAGES
+    ],
+  })
+)
+
+oci_image(
+  name = "image",
+  os = "linux",
+  architecture = select({
+    "@platforms//cpu:arm64": "arm64",
+    "@platforms//cpu:x86_64": "amd64",
+  }),
+  entrypoint = "entrypoint.txt",
+  cmd = "cmd.txt",
+  tars = [
+    ":debs",
+    ":app_files",
+  ],
+)
+
+oci_tarball(
+  name = "tarball",
+  image = ":image",
+  repo_tags = [
+    "distroless/test:latest",
+  ],
+)
